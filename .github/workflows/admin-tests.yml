@@ -1,0 +1,51 @@
+name: Superadmin Validation
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Run Unit Tests (Vitest)
+        run: npx vitest run
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        
+      - name: Run E2E Tests
+        # Note: This requires the backend and frontend to be buildable/startable in CI.
+        # Assuming npm run build && npm run preview or similar.
+        # For now, we run against the dev server using playwright's webServer config if enabled,
+        # or we just try running it (it will fail if server not up, so we commented out webServer in config).
+        # We will set a placeholder echo until the user configures the CI environment (DB, etc).
+        run: |
+          echo "E2E Tests Configured. Uncomment below line when CI Database is ready."
+          # npx playwright test e2e/admin.spec.ts

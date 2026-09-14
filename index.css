@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@config "./tailwind.config.js";
+
+@theme {
+    --color-indigo-50: #f4f6f8;
+    --color-indigo-100: #e2e8f0;
+    --color-indigo-200: #cbd5e1;
+    --color-indigo-300: #94a3b8;
+    --color-indigo-400: #64748b;
+    --color-indigo-500: #475569;
+    --color-indigo-600: #1A202C;
+    --color-indigo-700: #161b25;
+    --color-indigo-800: #11151c;
+    --color-indigo-900: #0d0f14;
+    --font-sans: Inter, sans-serif;
+}

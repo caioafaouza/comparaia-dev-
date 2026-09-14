@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comparaia_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio
+        env:
+          MINIO_ROOT_USER: admin
+          MINIO_ROOT_PASSWORD: password123
+        ports:
+          - 9000:9000
+          - 9001:9001
+        command: server /data --console-address ":9001"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run Migrations (Master)
+      run: npm run migrate:master --workspace server
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: comparaia_test
+
+    - name: Run Backend Tests
+      run: npm --workspace server test
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: comparaia_test
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        MINIO_ENDPOINT: localhost
+        MINIO_PORT: 9000
+        MINIO_ACCESS_KEY: admin
+        MINIO_SECRET_KEY: password123
+        MINIO_BUCKET: comparaia
+        JWT_SECRET: test-secret-ci
+        MASTER_ADMIN_EMAIL: admin@test.com
+        MASTER_ADMIN_PASSWORD: password
+
+    # Optional: Build Frontend to check for errors
+    - name: Build Frontend
+      run: npm run build:client
