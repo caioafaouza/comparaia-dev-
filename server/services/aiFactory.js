@@ -194,22 +194,42 @@ async function getAIClient(forceRefresh = false) {
 
         const googleAI = new GoogleGenAI({ apiKey });
 
+        const withRetry = async (fn, maxRetries = 3) => {
+            let lastError;
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    lastError = error;
+                    const is503 = error.status === 503 || (error.message && error.message.includes('503'));
+                    const is429 = error.status === 429 || (error.message && error.message.includes('429'));
+                    if (is503 || is429) {
+                        logger.warn(`Gemini API overloaded (Attempt ${attempt}/${maxRetries}). Retrying in ${attempt * 2}s...`);
+                        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+            throw lastError;
+        };
+
         return {
             provider: 'Gemini',
             modelName: config.geminiModel || 'gemini-2.5-flash',
             generateContent: async (prompt, systemInstruction) => {
                 const model = config.geminiModel || 'gemini-2.5-flash';
-                const result = await googleAI.models.generateContent({
+                const result = await withRetry(() => googleAI.models.generateContent({
                     model: model,
                     contents: prompt,
                     config: { systemInstruction }
-                });
+                }));
                 return result.text;
             },
             // Wrapper for JSON generation
             generateJSON: async (prompt, schema, systemInstruction) => {
                 const model = config.geminiModel || 'gemini-2.5-flash';
-                const result = await googleAI.models.generateContent({
+                const result = await withRetry(() => googleAI.models.generateContent({
                     model: model,
                     contents: prompt,
                     config: {
@@ -217,7 +237,7 @@ async function getAIClient(forceRefresh = false) {
                         responseSchema: schema,
                         systemInstruction
                     }
-                });
+                }));
                 return JSON.parse(result.text);
             }
         };
