@@ -147,15 +147,13 @@ const updateGlobalConfig = async (req, res) => {
         const newConfig = req.body;
         const db = connectionManager.getMaster();
 
-        // Upsert logic for SQLite/Postgres compatibility
-        // Upsert logic for SQLite/Postgres compatibility
         const existingRow = await db('system_config').where({ key: 'GLOBAL_CONFIG' }).first();
         let currentConfig = {};
         if (existingRow && existingRow.value) {
             currentConfig = typeof existingRow.value === 'string' ? JSON.parse(existingRow.value) : existingRow.value;
         }
 
-        const keysToSecure = ['geminiKey', 'openaiKey', 'stabilityKey'];
+        const keysToSecure = ['geminiKey', 'openaiKey', 'stabilityKey', 'anthropicKey'];
 
         keysToSecure.forEach(key => {
             if (newConfig[key]) {
