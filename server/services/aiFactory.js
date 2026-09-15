@@ -241,11 +241,13 @@ async function getAIClient(forceRefresh = false) {
             generateJSON: async (prompt, schema, systemInstruction) => {
                 const model = config.geminiModel || 'gemini-2.5-flash';
                 
-                // interactions.create expects standard JSON schema (lowercase types)
+                // models.generateContent expects UPPERCASE Type for responseSchema
                 const normalizeSchema = (s) => {
                     if (!s || typeof s !== 'object') return s;
                     const cloned = { ...s };
-                    if (cloned.type && typeof cloned.type === 'string') cloned.type = cloned.type.toLowerCase();
+                    if (cloned.type && typeof cloned.type === 'string') {
+                        cloned.type = cloned.type.toUpperCase();
+                    }
                     if (cloned.properties) {
                         for (const key of Object.keys(cloned.properties)) {
                             cloned.properties[key] = normalizeSchema(cloned.properties[key]);
@@ -255,25 +257,23 @@ async function getAIClient(forceRefresh = false) {
                     return cloned;
                 };
 
-                const result = await withRetry(() => googleAI.interactions.create({
+                const result = await withRetry(() => googleAI.models.generateContent({
                     model: model,
-                    input: prompt,
-                    system_instruction: systemInstruction,
-                    response_format: normalizeSchema(schema)
+                    contents: prompt,
+                    config: {
+                        systemInstruction: systemInstruction,
+                        responseMimeType: 'application/json',
+                        responseSchema: normalizeSchema(schema)
+                    }
                 }));
                 
                 let text = '';
-                if (typeof result.output_text === 'string') text = result.output_text;
-                else if (typeof result.text === 'string') text = result.text;
-                else if (typeof result.text === 'function') text = result.text();
-                else if (result.steps) {
-                    for (const step of result.steps) {
-                        if (step.type === 'model_output' && Array.isArray(step.content)) {
-                            text += step.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-                        }
-                    }
+                if (result && result.text) {
+                    text = typeof result.text === 'function' ? result.text() : result.text;
+                } else if (result && result.response && typeof result.response.text === 'function') {
+                    text = result.response.text();
                 }
-                
+
                 let cleanText = text.trim();
                 if (cleanText.startsWith('```')) {
                     const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/);
