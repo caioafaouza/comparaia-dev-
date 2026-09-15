@@ -219,26 +219,45 @@ async function getAIClient(forceRefresh = false) {
             modelName: config.geminiModel || 'gemini-2.5-flash',
             generateContent: async (prompt, systemInstruction) => {
                 const model = config.geminiModel || 'gemini-2.5-flash';
-                const result = await withRetry(() => googleAI.models.generateContent({
+                const result = await withRetry(() => googleAI.interactions.create({
                     model: model,
-                    contents: prompt,
-                    config: { systemInstruction }
+                    input: prompt,
+                    system_instruction: systemInstruction
                 }));
-                return result.text;
+                
+                let text = '';
+                if (typeof result.text === 'string') text = result.text;
+                else if (typeof result.text === 'function') text = result.text();
+                else if (result.steps) {
+                    for (const step of result.steps) {
+                        if (step.type === 'model_output' && Array.isArray(step.content)) {
+                            text += step.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+                        }
+                    }
+                }
+                return text;
             },
             // Wrapper for JSON generation
             generateJSON: async (prompt, schema, systemInstruction) => {
                 const model = config.geminiModel || 'gemini-2.5-flash';
-                const result = await withRetry(() => googleAI.models.generateContent({
+                const result = await withRetry(() => googleAI.interactions.create({
                     model: model,
-                    contents: prompt,
-                    config: {
-                        responseMimeType: "application/json",
-                        responseSchema: schema,
-                        systemInstruction
-                    }
+                    input: prompt,
+                    system_instruction: systemInstruction,
+                    response_format: schema
                 }));
-                return JSON.parse(result.text);
+                
+                let text = '';
+                if (typeof result.text === 'string') text = result.text;
+                else if (typeof result.text === 'function') text = result.text();
+                else if (result.steps) {
+                    for (const step of result.steps) {
+                        if (step.type === 'model_output' && Array.isArray(step.content)) {
+                            text += step.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+                        }
+                    }
+                }
+                return JSON.parse(text);
             }
         };
     }
