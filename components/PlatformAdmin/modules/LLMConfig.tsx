@@ -15,6 +15,7 @@ const LLMConfigModule: React.FC = () => {
     const [anthropicModels, setAnthropicModels] = useState<string[]>([]);
     const [anthropicModelsError, setAnthropicModelsError] = useState<string | null>(null);
     const [testLoading, setTestLoading] = useState(false);
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string; details?: string } | null>(null);
 
     useEffect(() => {
         getGlobalConfig().then(setConfig);
@@ -104,15 +105,20 @@ const LLMConfigModule: React.FC = () => {
 
     const handleTest = async () => {
         setTestLoading(true);
+        setTestResult(null);
         try {
             const res = await testAIProviderConnection();
             if (res.success) {
-                addToast(`Conexão OK! ${res.provider} (${res.latency}ms)`, 'success');
+                const msg = `Conexão OK! ${res.provider} (${res.latency}ms)`;
+                addToast(msg, 'success');
+                setTestResult({ success: true, message: msg });
             } else {
-                addToast(`Erro: ${res.error}`, 'error');
+                addToast(`Erro na API`, 'error');
+                setTestResult({ success: false, message: `Erro retornado por ${res.provider || 'API'}:`, details: res.error });
             }
         } catch (e: any) {
-            addToast(`Falha no teste: ${e.message}`, 'error');
+            addToast(`Falha na conexão`, 'error');
+            setTestResult({ success: false, message: 'Falha de comunicação ou Limite de Cota excedido:', details: e.message });
         } finally {
             setTestLoading(false);
         }
@@ -407,6 +413,24 @@ const LLMConfigModule: React.FC = () => {
                         onChange={e => setConfig({ ...config, customSystemPrompt: e.target.value })}
                     ></textarea>
                 </div>
+
+                {testResult && (
+                    <div className={`p-4 rounded-xl border mb-6 text-sm ${testResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                        <div className="font-bold flex items-center gap-2">
+                            {testResult.success ? (
+                                <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            ) : (
+                                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            )}
+                            {testResult.message}
+                        </div>
+                        {testResult.details && (
+                            <pre className="whitespace-pre-wrap font-mono text-xs mt-3 bg-white/60 p-3 rounded border border-black/5 overflow-x-auto text-slate-700">
+                                {testResult.details}
+                            </pre>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex justify-between pt-4 border-t border-slate-100">
                     <button
