@@ -237,14 +237,28 @@ async function getAIClient(forceRefresh = false) {
                 }
                 return text;
             },
-            // Wrapper for JSON generation
             generateJSON: async (prompt, schema, systemInstruction) => {
                 const model = config.geminiModel || 'gemini-2.5-flash';
+                
+                // interactions.create expects standard JSON schema (lowercase types)
+                const normalizeSchema = (s) => {
+                    if (!s || typeof s !== 'object') return s;
+                    const cloned = { ...s };
+                    if (cloned.type && typeof cloned.type === 'string') cloned.type = cloned.type.toLowerCase();
+                    if (cloned.properties) {
+                        for (const key of Object.keys(cloned.properties)) {
+                            cloned.properties[key] = normalizeSchema(cloned.properties[key]);
+                        }
+                    }
+                    if (cloned.items) cloned.items = normalizeSchema(cloned.items);
+                    return cloned;
+                };
+
                 const result = await withRetry(() => googleAI.interactions.create({
                     model: model,
                     input: prompt,
                     system_instruction: systemInstruction,
-                    response_format: schema
+                    response_format: normalizeSchema(schema)
                 }));
                 
                 let text = '';
@@ -257,7 +271,15 @@ async function getAIClient(forceRefresh = false) {
                         }
                     }
                 }
-                return JSON.parse(text);
+                
+                let cleanText = text.trim();
+                if (cleanText.startsWith('```')) {
+                    const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/);
+                    if (match) cleanText = match[1].trim();
+                    else cleanText = cleanText.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+                }
+                
+                return JSON.parse(cleanText);
             }
         };
     }
