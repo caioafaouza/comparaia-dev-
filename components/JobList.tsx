@@ -147,7 +147,16 @@ const JobList: React.FC<JobListProps> = ({ tenantId, onSelectJob, onNewJob }) =>
                     <td className="px-6 py-4 font-mono text-[11px] text-slate-600 break-all" title={job.id}>
                       {job.id}
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-800">{job.referenceName}</td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <span className="font-bold text-slate-800">{job.referenceName}</span>
+                        {job.status === 'FAILED' && job.error && (
+                            <div className="text-[11px] text-red-600 font-normal mt-1 leading-tight max-w-sm break-words whitespace-pre-wrap">
+                                {job.error}
+                            </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 font-mono font-bold">{job.cost} tk</td>
                     <td className="px-6 py-4 text-right">
                       <button onClick={(e) => handleDelete(job.id, e)} className="text-slate-400 hover:text-red-600 p-1">
