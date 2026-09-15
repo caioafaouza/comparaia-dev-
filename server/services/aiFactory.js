@@ -226,7 +226,8 @@ async function getAIClient(forceRefresh = false) {
                 }));
                 
                 let text = '';
-                if (typeof result.text === 'string') text = result.text;
+                if (typeof result.output_text === 'string') text = result.output_text;
+                else if (typeof result.text === 'string') text = result.text;
                 else if (typeof result.text === 'function') text = result.text();
                 else if (result.steps) {
                     for (const step of result.steps) {
@@ -262,7 +263,8 @@ async function getAIClient(forceRefresh = false) {
                 }));
                 
                 let text = '';
-                if (typeof result.text === 'string') text = result.text;
+                if (typeof result.output_text === 'string') text = result.output_text;
+                else if (typeof result.text === 'string') text = result.text;
                 else if (typeof result.text === 'function') text = result.text();
                 else if (result.steps) {
                     for (const step of result.steps) {
