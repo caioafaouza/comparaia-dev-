@@ -33,7 +33,7 @@
     "test:all": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
+    "@google/genai": "^2.22.0",
     "@tinymce/tinymce-react": "^6.3.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",

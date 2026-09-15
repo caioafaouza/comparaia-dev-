@@ -21,7 +21,7 @@
     "reset:full": "cross-env ALLOW_DB_NUKE=true node scripts/reset_database_full.cjs"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
+    "@google/genai": "^2.22.0",
     "@napi-rs/canvas": "^0.1.89",
     "axios": "^1.13.4",
     "bcryptjs": "^2.4.3",
