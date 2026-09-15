@@ -436,6 +436,119 @@ Schema esperado (JSON): ${JSON.stringify(schema)}` : '';
         };
     }
 
+    // --- ANTHROPIC ---
+    else if (provider.includes('Anthropic') || provider.includes('Claude')) {
+        let apiKey = resolveDbKey(config.anthropicKey, 'anthropic');
+
+        if (!apiKey && process.env.NODE_ENV !== 'production') {
+            apiKey = process.env.ANTHROPIC_API_KEY;
+        }
+
+        if (!apiKey) throw new Error("Chave Anthropic não configurada.");
+
+        const model = config.anthropicModel || 'claude-3-5-sonnet-20241022';
+        const timeoutMs = parseInt(process.env.ANTHROPIC_TIMEOUT_MS || '60000', 10);
+        
+        if (typeof fetch !== 'function') {
+            throw new Error('Fetch API indisponível no runtime do Node.');
+        }
+
+        const safeJsonParse = (value) => {
+            if (!value || typeof value !== 'string') return null;
+            try { return JSON.parse(value); } catch { return null; }
+        };
+
+        const extractJsonFromText = (value) => {
+            if (!value || typeof value !== 'string') return null;
+            const cleaned = value.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();
+            const firstObject = cleaned.indexOf('{');
+            const lastObject = cleaned.lastIndexOf('}');
+            if (firstObject !== -1 && lastObject > firstObject) return safeJsonParse(cleaned.slice(firstObject, lastObject + 1));
+            const firstArray = cleaned.indexOf('[');
+            const lastArray = cleaned.lastIndexOf(']');
+            if (firstArray !== -1 && lastArray > firstArray) return safeJsonParse(cleaned.slice(firstArray, lastArray + 1));
+            return safeJsonParse(cleaned);
+        };
+
+        const fetchJson = async (url, options = {}) => {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, { ...options, signal: controller.signal });
+                const raw = await response.text();
+                let data;
+                try { data = JSON.parse(raw); } catch { throw new Error(`Non-JSON response: ${response.status} ${raw.slice(0, 50)}`); }
+                if (!response.ok) {
+                    const err = new Error(data?.error?.message || `HTTP ${response.status}`);
+                    err.status = response.status;
+                    err.details = data || raw;
+                    throw err;
+                }
+                return data;
+            } finally {
+                clearTimeout(id);
+            }
+        };
+
+        const toTextPrompt = (prompt) => {
+            if (typeof prompt === 'string') return prompt;
+            if (!Array.isArray(prompt)) return JSON.stringify(prompt);
+            return prompt.map(entry => entry?.parts?.map(part => part.text || `[${part.inlineData?.mimeType || 'file'}]`).join('\n') || '').join('\n');
+        };
+
+        const callAnthropicMessage = async (payload) => {
+            return fetchJson('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    max_tokens: 8192,
+                    ...payload
+                })
+            });
+        };
+
+        return {
+            provider: 'Anthropic',
+            modelName: model,
+            generateContent: async (prompt, systemInstruction) => {
+                const finalSystemInstruction = (systemInstruction || 'You are a helpful assistant.') + (config.customSystemPrompt ? `\n\nDiretrizes Customizadas:\n${config.customSystemPrompt}` : '');
+                
+                const data = await callAnthropicMessage({
+                    system: finalSystemInstruction,
+                    messages: [{ role: 'user', content: toTextPrompt(prompt) }]
+                });
+
+                const content = data?.content?.[0]?.text;
+                if (!content) throw new Error('Anthropic retornou resposta vazia.');
+                return content;
+            },
+            generateJSON: async (prompt, schema, systemInstruction) => {
+                const schemaHint = schema ? `\nSchema esperado (JSON): ${JSON.stringify(schema)}` : '';
+                const finalSystemInstruction = (systemInstruction || '') + (config.customSystemPrompt ? `\n\nDiretrizes Customizadas:\n${config.customSystemPrompt}` : '');
+                const baseSystem = finalSystemInstruction.trim() + "\nRESTRICTION: Responda SOMENTE com JSON valido." + schemaHint;
+                
+                const data = await callAnthropicMessage({
+                    system: baseSystem,
+                    messages: [{ role: 'user', content: toTextPrompt(prompt) }]
+                });
+
+                const content = data?.content?.[0]?.text || '';
+                const directParsed = safeJsonParse(content);
+                if (directParsed) return directParsed;
+
+                const extracted = extractJsonFromText(content);
+                if (extracted) return extracted;
+
+                throw new Error('Anthropic retornou JSON invalido.');
+            }
+        };
+    }
+
     throw new Error(`Provedor desconhecido: ${provider}`);
 }
 

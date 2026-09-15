@@ -114,6 +114,8 @@ function createApp() {
   apiRouter.post('/admin/config', adminGuard, adminController.updateGlobalConfig);
   apiRouter.get('/admin/llm/smoke', adminGuard, adminController.testAIProvider);
   apiRouter.get('/admin/openai-models', adminGuard, adminController.getOpenAIModels);
+  apiRouter.get('/admin/gemini-models', adminGuard, adminController.getGeminiModels);
+  apiRouter.get('/admin/anthropic-models', adminGuard, adminController.getAnthropicModels);
   apiRouter.get('/admin/tenants', adminGuard, adminController.getAllTenants);
   apiRouter.patch('/admin/tenants/:id', adminGuard, adminController.updateTenant);
   apiRouter.delete('/admin/tenants/:id', adminGuard, adminController.deleteTenant);

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getGlobalConfig, getOpenAIModels, updateGlobalConfig, testAIProviderConnection } from '../../../services/api';
+import { getGlobalConfig, getOpenAIModels, getGeminiModels, getAnthropicModels, updateGlobalConfig, testAIProviderConnection } from '../../../services/api';
 import { GlobalSystemConfig } from '../../../types';
 import { useToast } from '../../../contexts/ToastContext';
 
@@ -10,6 +10,10 @@ const LLMConfigModule: React.FC = () => {
     const [showKeys, setShowKeys] = useState(false);
     const [openaiModels, setOpenaiModels] = useState<string[]>([]);
     const [openaiModelsError, setOpenaiModelsError] = useState<string | null>(null);
+    const [geminiModels, setGeminiModels] = useState<string[]>([]);
+    const [geminiModelsError, setGeminiModelsError] = useState<string | null>(null);
+    const [anthropicModels, setAnthropicModels] = useState<string[]>([]);
+    const [anthropicModelsError, setAnthropicModelsError] = useState<string | null>(null);
     const [testLoading, setTestLoading] = useState(false);
 
     useEffect(() => {
@@ -42,6 +46,54 @@ const LLMConfigModule: React.FC = () => {
         };
     }, [config?.openaiKey]);
 
+    useEffect(() => {
+        let isActive = true;
+        const loadModels = async () => {
+            if (!config?.geminiKey || config.geminiKey.length <= 5) {
+                setGeminiModels([]);
+                setGeminiModelsError(null);
+                return;
+            }
+            try {
+                const result = await getGeminiModels();
+                if (!isActive) return;
+                const models = Array.isArray(result?.models) ? result.models : [];
+                setGeminiModels(models);
+                setGeminiModelsError(null);
+            } catch (err: any) {
+                if (!isActive) return;
+                setGeminiModels([]);
+                setGeminiModelsError(err?.message || 'Falha ao carregar modelos.');
+            }
+        };
+        loadModels();
+        return () => { isActive = false; };
+    }, [config?.geminiKey]);
+
+    useEffect(() => {
+        let isActive = true;
+        const loadModels = async () => {
+            if (!config?.anthropicKey || config.anthropicKey.length <= 5) {
+                setAnthropicModels([]);
+                setAnthropicModelsError(null);
+                return;
+            }
+            try {
+                const result = await getAnthropicModels();
+                if (!isActive) return;
+                const models = Array.isArray(result?.models) ? result.models : [];
+                setAnthropicModels(models);
+                setAnthropicModelsError(null);
+            } catch (err: any) {
+                if (!isActive) return;
+                setAnthropicModels([]);
+                setAnthropicModelsError(err?.message || 'Falha ao carregar modelos.');
+            }
+        };
+        loadModels();
+        return () => { isActive = false; };
+    }, [config?.anthropicKey]);
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (config) {
@@ -70,6 +122,8 @@ const LLMConfigModule: React.FC = () => {
 
     const hasGeminiKey = config.geminiKey && config.geminiKey.length > 5;
     const hasOpenAIKey = config.openaiKey && config.openaiKey.length > 5;
+    const hasAnthropicKey = config.anthropicKey && config.anthropicKey.length > 5;
+    
     const fallbackOpenAIModels = [
         'gpt-5',
         'gpt-5-mini',
@@ -81,6 +135,17 @@ const LLMConfigModule: React.FC = () => {
         'o1',
         'o3',
         'o4'
+    ];
+    const fallbackGeminiModels = [
+        'gemini-2.5-flash',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash'
+    ];
+    const fallbackAnthropicModels = [
+        'claude-3-5-sonnet-20241022',
+        'claude-3-5-sonnet-20240620',
+        'claude-3-haiku-20240307',
+        'claude-3-opus-20240229'
     ];
 
     return (
@@ -127,7 +192,7 @@ const LLMConfigModule: React.FC = () => {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                         {/* Gemini Config */}
                         <div className={`p-4 rounded-lg border transition-all ${config.activeAIProvider === 'Google Gemini' ? 'bg-white border-indigo-500 ring-4 ring-indigo-50 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-80'}`}>
                             <div className="flex items-center gap-2 mb-3">
@@ -146,16 +211,37 @@ const LLMConfigModule: React.FC = () => {
                             {/* Model Selection - Shows only if Key is present */}
                             {hasGeminiKey ? (
                                 <div className="mt-3 pt-3 border-t border-slate-100 animate-fade-in">
-                                    <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">Modelo Disponível</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">Modelo Disponível</label>
+                                        <button
+                                            type="button"
+                                            className="text-[10px] text-indigo-600 font-bold hover:underline"
+                                            onClick={() => {
+                                                setGeminiModelsError(null);
+                                                setGeminiModels([]);
+                                                getGeminiModels()
+                                                    .then((result) => {
+                                                        const models = Array.isArray(result?.models) ? result.models : [];
+                                                        setGeminiModels(models);
+                                                    })
+                                                    .catch((err: any) => setGeminiModelsError(err?.message || 'Falha ao carregar modelos.'));
+                                            }}
+                                        >
+                                            Recarregar
+                                        </button>
+                                    </div>
                                     <select
                                         className="w-full border border-indigo-200 bg-indigo-50/50 p-2 rounded text-xs font-medium text-slate-700 focus:ring-1 focus:ring-indigo-500"
                                         value={config.geminiModel || 'gemini-2.5-flash'}
                                         onChange={e => setConfig({ ...config, geminiModel: e.target.value })}
                                     >
-                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Rápido & Econômico)</option>
-                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Melhor Raciocínio)</option>
-                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
+                                        {(geminiModels.length ? geminiModels : fallbackGeminiModels).map((model) => (
+                                            <option key={model} value={model}>{model}</option>
+                                        ))}
                                     </select>
+                                    {geminiModelsError && (
+                                        <p className="text-[10px] text-amber-600 mt-2">{geminiModelsError}. Usando lista padrão.</p>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-[10px] text-slate-400 mt-2 italic">Adicione a chave para selecionar o modelo.</p>
@@ -231,6 +317,59 @@ const LLMConfigModule: React.FC = () => {
                                     </select>
                                     {openaiModelsError && (
                                         <p className="text-[10px] text-amber-600 mt-2">{openaiModelsError}. Usando lista padrão.</p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-[10px] text-slate-400 mt-2 italic">Adicione a chave para selecionar o modelo.</p>
+                            )}
+                        </div>
+
+                        {/* Anthropic Config */}
+                        <div className={`p-4 rounded-lg border transition-all ${config.activeAIProvider.includes('Anthropic') ? 'bg-white border-indigo-500 ring-4 ring-indigo-50 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-80'}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                                <span className="font-bold text-slate-700">Anthropic Claude</span>
+                            </div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">API KEY</label>
+                            <input
+                                type={showKeys ? "text" : "password"}
+                                className="w-full border p-2 rounded text-sm font-mono focus:ring-2 focus:ring-indigo-500"
+                                placeholder="sk-ant-..."
+                                value={config.anthropicKey || ''}
+                                onChange={e => setConfig({ ...config, anthropicKey: e.target.value })}
+                            />
+                            {hasAnthropicKey ? (
+                                <div className="mt-3 pt-3 border-t border-slate-100 animate-fade-in">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">Modelo Disponível</label>
+                                        <button
+                                            type="button"
+                                            className="text-[10px] text-indigo-600 font-bold hover:underline"
+                                            onClick={() => {
+                                                setAnthropicModelsError(null);
+                                                setAnthropicModels([]);
+                                                getAnthropicModels()
+                                                    .then((result) => {
+                                                        const models = Array.isArray(result?.models) ? result.models : [];
+                                                        setAnthropicModels(models);
+                                                    })
+                                                    .catch((err: any) => setAnthropicModelsError(err?.message || 'Falha ao carregar modelos.'));
+                                            }}
+                                        >
+                                            Recarregar
+                                        </button>
+                                    </div>
+                                    <select
+                                        className="w-full border border-indigo-200 bg-indigo-50/50 p-2 rounded text-xs font-medium text-slate-700 focus:ring-1 focus:ring-indigo-500"
+                                        value={config.anthropicModel || 'claude-3-5-sonnet-20241022'}
+                                        onChange={e => setConfig({ ...config, anthropicModel: e.target.value })}
+                                    >
+                                        {(anthropicModels.length ? anthropicModels : fallbackAnthropicModels).map((model) => (
+                                            <option key={model} value={model}>{model}</option>
+                                        ))}
+                                    </select>
+                                    {anthropicModelsError && (
+                                        <p className="text-[10px] text-amber-600 mt-2">{anthropicModelsError}. Usando lista padrão.</p>
                                     )}
                                 </div>
                             ) : (

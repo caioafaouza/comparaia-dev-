@@ -572,6 +572,8 @@ const getOpenAIModels = async (req, res) => {
             return res.status(status).json({ error: msg });
         }
 
+
+
         const models = (data.data || [])
             .map((model) => model.id)
             .filter(Boolean)
@@ -581,6 +583,101 @@ const getOpenAIModels = async (req, res) => {
     } catch (error) {
         console.error('OpenAI Models Error:', error);
         res.status(500).json({ error: 'Erro ao buscar modelos OpenAI.' });
+    }
+};
+
+const getGeminiModels = async (req, res) => {
+    try {
+        const db = connectionManager.getMaster();
+        const configRow = await db('system_config').where({ key: 'GLOBAL_CONFIG' }).first();
+        let config = {};
+
+        if (configRow && configRow.value) {
+            config = typeof configRow.value === 'string'
+                ? JSON.parse(configRow.value)
+                : configRow.value;
+        }
+
+        let geminiKey = config.geminiKey || process.env.GEMINI_API_KEY;
+
+        if (geminiKey && !geminiKey.startsWith('AIza') && geminiKey.includes(':')) {
+            try {
+                const { decrypt } = require('../utils/crypto');
+                geminiKey = decrypt(geminiKey);
+            } catch (e) {}
+        }
+
+        if (!geminiKey) {
+            return res.status(400).json({ error: 'Chave Gemini não configurada.' });
+        }
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            return res.status(response.status).json({ error: data?.error?.message || 'Falha ao listar modelos do Gemini.' });
+        }
+
+        const models = (data.models || [])
+            .filter(model => model.supportedGenerationMethods && model.supportedGenerationMethods.includes('generateContent'))
+            .map(model => model.name.replace('models/', ''))
+            .sort();
+
+        res.json({ models });
+    } catch (error) {
+        console.error('Gemini Models Error:', error);
+        res.status(500).json({ error: 'Erro ao buscar modelos Gemini.' });
+    }
+};
+
+const getAnthropicModels = async (req, res) => {
+    try {
+        const db = connectionManager.getMaster();
+        const configRow = await db('system_config').where({ key: 'GLOBAL_CONFIG' }).first();
+        let config = {};
+
+        if (configRow && configRow.value) {
+            config = typeof configRow.value === 'string'
+                ? JSON.parse(configRow.value)
+                : configRow.value;
+        }
+
+        let anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
+
+        if (anthropicKey && !anthropicKey.startsWith('sk-ant-') && anthropicKey.includes(':')) {
+            try {
+                const { decrypt } = require('../utils/crypto');
+                anthropicKey = decrypt(anthropicKey);
+            } catch (e) {}
+        }
+
+        if (!anthropicKey) {
+            return res.status(400).json({ error: 'Chave Anthropic não configurada.' });
+        }
+
+        const headers = { 
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01'
+        };
+
+        const response = await fetch(`https://api.anthropic.com/v1/models`, { headers });
+        const data = await response.json();
+        
+        if (!response.ok) {
+            const status = response.status === 401 ? 400 : response.status;
+            const msg = response.status === 401 ? 'Chave Anthropic inválida ou expirada.' : (data?.error?.message || 'Falha ao listar modelos da Anthropic.');
+            return res.status(status).json({ error: msg });
+        }
+
+        const models = (data.data || [])
+            .map((model) => model.id)
+            .filter(Boolean)
+            .sort();
+
+        res.json({ models });
+    } catch (error) {
+        console.error('Anthropic Models Error:', error);
+        res.status(500).json({ error: 'Erro ao buscar modelos Anthropic.' });
     }
 };
 
@@ -824,4 +921,4 @@ const testAIProvider = async (req, res) => {
     }
 };
 
-module.exports = { getGlobalConfig, getPublicConfig, updateGlobalConfig, getAllTenants, deleteTenant, getAllUsersGlobal, deleteGlobalUser, getDashboardOverview, getOpenAIModels, updateTenant, updateGlobalUser, testAIProvider };
+module.exports = { getGlobalConfig, getPublicConfig, updateGlobalConfig, getAllTenants, deleteTenant, getAllUsersGlobal, deleteGlobalUser, getDashboardOverview, getOpenAIModels, getGeminiModels, getAnthropicModels, updateTenant, updateGlobalUser, testAIProvider };

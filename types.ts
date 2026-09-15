@@ -232,6 +232,8 @@ export interface GlobalSystemConfig {
   openaiOrg?: string;
   openaiProject?: string;
   stabilityKey?: string;
+  anthropicKey?: string;
+  anthropicModel?: string;
   customSystemPrompt?: string;
   enablePublicSignup?: boolean;
   maintenanceMessage?: string;

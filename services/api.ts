@@ -568,6 +568,14 @@ export const getOpenAIModels = () => {
     return apiFetch(`/admin/openai-models`);
 };
 
+export const getGeminiModels = () => {
+    return apiFetch(`/admin/gemini-models`);
+};
+
+export const getAnthropicModels = () => {
+    return apiFetch(`/admin/anthropic-models`);
+};
+
 export const testAIProviderConnection = () => {
     return apiFetch(`/admin/llm/smoke`);
 };
